@@ -16,8 +16,10 @@ namespace B1_2.DB.Repositories
 
         public async Task DeleteFileReportAsync(string filename, CancellationToken cancellationToken)
         {
+            //атомарная операция с помощью транзакции -> удаляем все записи файла и сам файл
             await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
+            //поиск по имнени файла
             await _db.AccountBalances
                 .Where(b => b.UploadedFile.FileName == filename)
                 .ExecuteDeleteAsync(cancellationToken);
@@ -31,12 +33,15 @@ namespace B1_2.DB.Repositories
 
         public async Task<List<UploadedFile>> GetFilesAsync(CancellationToken cancellationToken)
         {
+            //все существующие записи в таблице файлов
             var files = await _db.UploadedFiles.ToListAsync(cancellationToken);
             return files;
         }
 
         public async Task<UploadedReportDto> GetReportByFileAsync(string file, CancellationToken cancellationToken)
         {
+            //получаем все данные, загруженные из одного файла (file) из бд
+            // + подгружаем связанные данные через жадную загрузку
             var balances = await _db.AccountBalances
                 .Include(b => b.UploadedFile)
                 .Include(b => b.Period)
@@ -44,6 +49,8 @@ namespace B1_2.DB.Repositories
                 .Include(b => b.Account).ThenInclude(a => a.Bank)
                 .Where(b => b.UploadedFile.FileName == file)
                 .ToListAsync(cancellationToken);
+
+            //преобразуем в dto чтобы отдать данные
 
             var period = balances.First().Period;
 
@@ -58,7 +65,7 @@ namespace B1_2.DB.Repositories
                 AccountNumber = b.Account?.AccountNumber.ToString(),
                 AccountClassName = b.Account?.AccountClass?.Name
             }).ToList();
-
+            
             var report = new UploadedReportDto
             {
                 FileName = file,

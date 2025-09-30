@@ -1,5 +1,6 @@
 ﻿namespace B1_2.DTO
 {
+    //dto для вывода баланса аккаунта (избегаем циклических зависимостей и зависимости от моделей бд)
     public class AccountBalanceDto
     {
         public decimal InpBalanceActive { get; set; }

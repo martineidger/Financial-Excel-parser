@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace B1_2.DB;
 
+//модель загруженного файла (откуда брались данные)
 public partial class UploadedFile
 {
     public Guid Id { get; set; }

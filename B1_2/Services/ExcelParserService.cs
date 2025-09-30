@@ -8,20 +8,28 @@ using System.Text.RegularExpressions;
 
 namespace B1_2.Services
 {
+    //реализация сервиса для парсинга данных из excel
     public class ExcelParserService : IExcelParserService
     {
         public ParsedReportDto Parse(Stream excelStream)
         {
+            //обьект файла из потока
             var workbook = new HSSFWorkbook(excelStream);
+
+            //берем первую страницу
             var sheet = workbook.GetSheetAt(0);
 
+            //обьект отчета, куда будут заполняться данные из файла 
             var report = new ParsedReportDto();
 
+            //имя банка. положение четко известно - 1 ячейка по строке и столбцу
             report.BankName = sheet.GetRow(0)?.GetCell(0)?.ToString();
 
+            //получем ячейку с периодом
             IRow? periodRow = sheet.FirstOrDefault(r =>
                 r.Cells().Any(c => c?.ToString()?.Contains("за период") == true));
 
+            //проверки + парсинг даты в переменные в отчет
             if (periodRow != null)
             {
                 string periodText = periodRow.GetCell(0)?.ToString() ?? "";
@@ -37,6 +45,7 @@ namespace B1_2.Services
                 }
             }
 
+            //находим стартовую строку с номерами счетов (и другими заголовками)
             IRow headerRow = sheet.First(r =>
                 r.Cells().Any(c => c?.ToString()?.StartsWith("Б/сч") == true));
 
@@ -44,6 +53,7 @@ namespace B1_2.Services
 
             ParsedAccountClassDto? currentClass = null;
 
+            //обработка счетов и балансов счетов
             for (int i = startRow; i <= sheet.LastRowNum; i++)
             {
                 var row = sheet.GetRow(i);
@@ -54,6 +64,7 @@ namespace B1_2.Services
                 if (string.IsNullOrWhiteSpace(firstCell))
                     continue;
 
+                //если ячейка для класса -> добавляем в данные о классе
                 if (firstCell.StartsWith("КЛАСС"))
                 {
                     var parts = firstCell.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -67,11 +78,13 @@ namespace B1_2.Services
                     continue;
                 }
 
+                //если обычный номер -> добавляем данные о счете и его балансе
                 if (int.TryParse(firstCell, out int accountNumber))
                 {
                     if (currentClass == null)
                         throw new InvalidOperationException($"Счёт {accountNumber} встретился без класса!");
 
+                    //данные о счете
                     var acc = new ParsedAccountDto
                     {
                         AccountNumber = accountNumber,
@@ -80,6 +93,7 @@ namespace B1_2.Services
                     report.Accounts.Add(acc);
 
                 
+                    //данные о балансе
                     report.AccountBalances.Add(new ParsedAccountBalanceDto
                     {
                         AccountNumber = accountNumber,
@@ -98,7 +112,7 @@ namespace B1_2.Services
 
             return report;
         }
-
+        //метод для парсинга и проверки дробного числа из ячейки
         private decimal ParseDecimal(ICell? cell)
         {
             if (cell == null) return 0;
@@ -114,16 +128,20 @@ namespace B1_2.Services
         }
     }
 
-    public static class NpoiExtensions
+    // вспомогательны функции для удобного парсинга
+    public static class ExcelExtensions
     {
+        //преобразуем страницу excel в набор строк
         public static IEnumerable<IRow> Rows(this ISheet sheet)
         {
             for (int i = sheet.FirstRowNum; i <= sheet.LastRowNum; i++)
             {
+                //позволяет не загружать память, а отдавать строки по мере запроса
                 yield return sheet.GetRow(i);
             }
         }
 
+        //преобразуем строку в набор ячеек
         public static IEnumerable<ICell> Cells(this IRow row)
         {
             for (int i = row.FirstCellNum; i < row.LastCellNum; i++)
@@ -132,6 +150,8 @@ namespace B1_2.Services
             }
         }
 
+        //реализация метода FirstOrDefault из Linq, но для работы со страницами и строками
+        //находит строку по условию или возвращает null
         public static IRow? FirstOrDefault(this ISheet sheet, Func<IRow, bool> predicate)
         {
             foreach (var row in sheet.Rows())
@@ -142,6 +162,8 @@ namespace B1_2.Services
             return null;
         }
 
+        //реализация метода First из Linq, но для работы со страницами и строками
+        //находит строку по условию или выбрасывает исключение
         public static IRow First(this ISheet sheet, Func<IRow, bool> predicate)
         {
             foreach (var row in sheet.Rows())

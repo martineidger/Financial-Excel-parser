@@ -2,6 +2,7 @@
 
 namespace B1_2.DTO
 {
+    //dto для вывода данных отчета (из одного загруженного файла)
     public class UploadedReportDto
     {
         public string FileName { get; set; }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace B1_2.DB;
 
+//модель периода
 public partial class Period
 {
     public Guid Id { get; set; }

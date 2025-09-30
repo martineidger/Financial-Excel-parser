@@ -9,6 +9,7 @@ using Z.EntityFramework.Extensions;
 
 namespace B1_2.Services
 {
+    //реадизация сервиса для сохранения данных в бд
     public class DbSaverService : IDbSaverService
     {
         private readonly BalanceSheetsDbContext _context;
@@ -23,17 +24,21 @@ namespace B1_2.Services
             if (parsedReport == null)
                 throw new ArgumentNullException(nameof(parsedReport));
 
+            //транзакция для атомарности
             using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
+            //иницилизация пустых списков для новых добавляемых данных
             var newBanks = new List<Bank>();
             var newPeriods = new List<DB.Period>();
             var newClasses = new List<AccountClass>();
             var newAccounts = new List<Account>();
             var newBalances = new List<AccountBalance>();
 
+            //берем данные из бд об уже существ банках
             var existingBanks = await _context.Banks
                 .ToDictionaryAsync(b => b.Name, b => b, cancellationToken);
 
+            //если такого еще нет -> добавляем
             if (!existingBanks.TryGetValue(parsedReport.BankName, out var bank))
             {
                 bank = new Bank
@@ -44,32 +49,43 @@ namespace B1_2.Services
                 newBanks.Add(bank);
                 existingBanks[bank.Name] = bank;
             }
+            //если есть, то запоминаем его айди
+            else
+            {
+                bank = existingBanks[parsedReport.BankName];
+            }
 
+            //берем существующие периоды в словарь по датам начала и конца (уникальность периодов смотрим именно по ним)
             var existingPeriods = await _context.Periods
                 .ToDictionaryAsync(p => (p.DateStart, p.DateEnd), p => p, cancellationToken);
 
             var key = (parsedReport.PeriodStart, parsedReport.PeriodEnd);
             var newPeriod = new DB.Period();
+
+            //если не существует -> добавляем
             if (!existingPeriods.ContainsKey(key))
             {
-
                 newPeriod.Id = Guid.NewGuid();
                 newPeriod.DateStart = parsedReport.PeriodStart;
                 newPeriod.DateEnd = parsedReport.PeriodEnd;
                 newPeriods.Add(newPeriod);
                 existingPeriods[key] = newPeriod;
             }
+            //если есть, то запоминаем его айди
             else
             {
                 newPeriod.Id = existingPeriods[key].Id;
             }
 
+
+            //берем существующие классы аккаунтов
             var existingClasses = await _context.AccountClasses
                 .ToDictionaryAsync(c => c.Code, c => c, cancellationToken);
 
-          
+            //перебираем все классы 
             foreach (var accClassDto in parsedReport.AccountClasses)
             {
+                //если не существует -> добавляем
                 if (!existingClasses.TryGetValue(accClassDto.Code, out var dbClass))
                 {
                     dbClass = new AccountClass
@@ -83,13 +99,15 @@ namespace B1_2.Services
                 }
             }
 
-
+            //берем существующие аккаунты
             var existingAccounts = await _context.Accounts
                 .Where(a => a.BankId == bank.Id)
                 .ToDictionaryAsync(a => a.AccountNumber, a => a, cancellationToken);
 
+            //перебираем все аккаунты
             foreach (var accDto in parsedReport.Accounts)
             {
+                //если не существует -> добавляем
                 if (!existingAccounts.TryGetValue(accDto.AccountNumber, out var dbAcc))
                 {
                     dbAcc = new Account
@@ -104,13 +122,15 @@ namespace B1_2.Services
                 }
             }
 
-
+            //сохраняем данные о файле, из которого была загрузка
             var uploadedFile = new UploadedFile
             {
                 Id = Guid.NewGuid(),
                 FileName = parsedReport.FileName,
                 UploadDate = DateTime.Now
             };
+
+            //добавляем данные в контекст -> в бд
             await _context.UploadedFiles.AddAsync(uploadedFile, cancellationToken);
 
             await _context.Banks.AddRangeAsync(newBanks, cancellationToken);
@@ -121,6 +141,7 @@ namespace B1_2.Services
 
             var accountBalances = new List<AccountBalance>();
 
+            //заполняем список балансов чтобы отправить в бд напрямую без ef
             foreach (var balanceDto in parsedReport.AccountBalances)
             {
                 if (!existingAccounts.TryGetValue(balanceDto.AccountNumber, out var account))
@@ -152,10 +173,13 @@ namespace B1_2.Services
             await transaction.CommitAsync(cancellationToken);
         }
 
+        //метод для формирования полного запроса в бд и его отправки
         private async Task SaveAccountBalancesWithCopy(List<AccountBalance> balances, CancellationToken cancellationToken)
         {
+            //получаем обьект подключение к бд из контекста
             var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
 
+            //формируем обьект для записи (using т.к. сторонний ресурс, а именно бд)
             using var writer = conn.BeginBinaryImport(@"
                 COPY account_balances (
                     id,
@@ -185,6 +209,8 @@ namespace B1_2.Services
                 writer.Write(b.OutpBalancePassive, NpgsqlDbType.Numeric);
             }
 
+
+            //выполняем команду
             await writer.CompleteAsync(cancellationToken);
         }
     }

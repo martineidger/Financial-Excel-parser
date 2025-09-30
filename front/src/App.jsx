@@ -90,7 +90,7 @@ function App() {
     const file = event.target.files[0];
     if (!file) return;
 
-    if (!file.name.match(/\.(xlsx|xls)$/)) {
+    if (!file.name.match(/\.(xls)$/)) {
       alert("Пожалуйста, выберите файл Excel с расширением .xlsx или .xls");
       return;
     }

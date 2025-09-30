@@ -3,6 +3,7 @@ using B1_2.DB;
 
 namespace B1_2.DTO
 {
+    //dto для парсинга всего отчета (агрегирует все dto и другую информацию полученную из файла)
     public class ParsedReportDto
     {
         public string BankName { get; set; } = "";

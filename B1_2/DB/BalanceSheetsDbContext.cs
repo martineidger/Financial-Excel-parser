@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace B1_2.DB;
 
+//сгенерированный контекст бд (на основе готовых таблиц в бд)
 public partial class BalanceSheetsDbContext : DbContext
 {
     public BalanceSheetsDbContext()

@@ -3,28 +3,32 @@ using System.Net;
 
 namespace B1_2.Middlewares
 {
+    //глобальный обработчик ошибок -> стоит в начале контейнера и ловит все ошибки (отдает с нужным кодом)
     public class ExceptionMiddleware
     {
+        //ссылка на следующий компонент в конвейере обработки
         private readonly RequestDelegate _next;
-        private readonly ILogger<ExceptionMiddleware> logger;
 
-        public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
+        public ExceptionMiddleware(RequestDelegate next)
         {
             _next = next;
-            this.logger = logger;
         }
 
+        //главный метод, кторый вызывается когда конвейер вызывает этот компонент
         public async Task InvokeAsync(HttpContext context)
         {
             try
             {
+                //все запросы будут проходить через это try, т.о. все ошибки будут пробрасываться сюда
                 await _next(context);
             }
+            //ошибка операции
             catch (InvalidOperationException ex)
             {
                 context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                 await HandleException(context, ex);
             }
+            //базовый класс ошибки -> все ошибки обработаются 
             catch (Exception ex)
             {
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -32,9 +36,9 @@ namespace B1_2.Middlewares
             }
 
         }
+        //метод для обработки ошибки
         private async Task HandleException(HttpContext context, Exception ex)
         {
-            logger.LogError($"Error: {ex.ToString()}");
 
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsJsonAsync(new

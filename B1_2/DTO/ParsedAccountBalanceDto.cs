@@ -1,5 +1,6 @@
 ﻿namespace B1_2.DTO
 {
+    //dto для парсинга данных баланса
     public class ParsedAccountBalanceDto
     {
         public int AccountNumber { get; set; }

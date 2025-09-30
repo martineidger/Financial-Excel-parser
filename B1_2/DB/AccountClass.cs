@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace B1_2.DB;
 
+//модель класса счета
 public partial class AccountClass
 {
     public Guid Id { get; set; }

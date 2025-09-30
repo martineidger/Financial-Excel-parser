@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace B1_2.DB;
 
+//модель банка
 public partial class Bank
 {
     public Guid Id { get; set; }
